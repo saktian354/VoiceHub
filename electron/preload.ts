@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getUsageLogs: (limit?: number) => ipcRenderer.invoke('db:getUsageLogs', limit),
     addUsageLog: (log: UsageLog) => ipcRenderer.invoke('db:addUsageLog', log),
 
+    deleteUsageLog: (id: number) => ipcRenderer.invoke('db:deleteUsageLog', id),
     getVoiceProfiles: () => ipcRenderer.invoke('db:getVoiceProfiles'),
     addVoiceProfile: (profile: VoiceProfile) => ipcRenderer.invoke('db:addVoiceProfile', profile),
     deleteVoiceProfile: (id: number) => ipcRenderer.invoke('db:deleteVoiceProfile', id),
@@ -61,6 +62,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('tts:getVoices', apiKeyRecord),
     checkQuota: (apiKeyRecord: ApiKey) =>
       ipcRenderer.invoke('api:checkQuota', apiKeyRecord),
+  },
+
+  // Audio file operations
+  audio: {
+    saveTempAudio: (audioData: number[], format: string) =>
+      ipcRenderer.invoke('audio:saveTempAudio', audioData, format),
+    saveToFile: (audioData: number[], defaultName: string) =>
+      ipcRenderer.invoke('audio:saveToFile', audioData, defaultName),
+    readFile: (filePath: string) =>
+      ipcRenderer.invoke('audio:readFile', filePath),
+    cleanupTemp: () => ipcRenderer.invoke('audio:cleanupTemp'),
   },
 
   // App info

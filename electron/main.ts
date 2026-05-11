@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, net } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { getDatabase, closeDatabase } from './db'
 
 let mainWindow: BrowserWindow | null = null
@@ -29,6 +30,15 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+}
+
+function getDataPath(): string {
+  const exePath = app.getPath('exe')
+  const exeDir = path.dirname(exePath)
+  if (!app.isPackaged) {
+    return path.join(process.cwd(), 'voicehub-data')
+  }
+  return path.join(exeDir, 'voicehub-data')
 }
 
 // Initialize database
@@ -183,12 +193,7 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('app:getDataPath', () => {
-    const exePath = app.getPath('exe')
-    const exeDir = path.dirname(exePath)
-    if (!app.isPackaged) {
-      return path.join(process.cwd(), 'voicehub-data')
-    }
-    return path.join(exeDir, 'voicehub-data')
+    return getDataPath()
   })
 
   // TTS Operations
@@ -459,6 +464,88 @@ function registerIpcHandlers(): void {
           : 'Gagal mengambil informasi kuota.',
       }
     }
+  })
+
+  // Audio file operations
+  ipcMain.handle('audio:saveTempAudio', (_event, audioData: number[], format: string) => {
+    try {
+      const dataPath = getDataPath()
+      const tempDir = path.join(dataPath, 'temp_audio')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+      const filename = `${Date.now()}.${format}`
+      const filePath = path.join(tempDir, filename)
+      const buffer = Buffer.from(audioData)
+      fs.writeFileSync(filePath, buffer)
+      return { success: true, filePath }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('audio:saveToFile', async (_event, audioData: number[], defaultName: string) => {
+    try {
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        defaultPath: defaultName,
+        filters: [
+          { name: 'MP3 Audio', extensions: ['mp3'] },
+          { name: 'WAV Audio', extensions: ['wav'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      })
+      if (result.canceled || !result.filePath) return { success: false, canceled: true }
+
+      const buffer = Buffer.from(audioData)
+      fs.writeFileSync(result.filePath, buffer)
+      return { success: true, filePath: result.filePath }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('audio:readFile', (_event, filePath: string) => {
+    try {
+      if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' }
+      const buffer = fs.readFileSync(filePath)
+      return { success: true, audioData: Array.from(new Uint8Array(buffer)) }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('audio:cleanupTemp', () => {
+    try {
+      const dataPath = getDataPath()
+      const tempDir = path.join(dataPath, 'temp_audio')
+      if (!fs.existsSync(tempDir)) return { success: true, deleted: 0 }
+
+      const now = Date.now()
+      const maxAge = 24 * 60 * 60 * 1000
+      const files = fs.readdirSync(tempDir)
+      let deleted = 0
+
+      for (const file of files) {
+        const filePath = path.join(tempDir, file)
+        const stat = fs.statSync(filePath)
+        if (now - stat.mtimeMs > maxAge) {
+          fs.unlinkSync(filePath)
+          deleted++
+        }
+      }
+
+      return { success: true, deleted }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('db:deleteUsageLog', (_event, id: number) => {
+    return db.prepare('DELETE FROM usage_logs WHERE id = ?').run(id)
   })
 
   // File dialogs
