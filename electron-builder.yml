@@ -1,0 +1,23 @@
+appId: com.voicehub.app
+productName: VoiceHub
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+asar: true
+asarUnpack:
+  - "**/*.node"
+win:
+  target: portable
+  icon: build/icon.ico
+portable:
+  artifactName: VoiceHub-${version}-portable.exe
+mac:
+  target: zip
+  icon: build/icon.icns
+  category: public.app-category.utilities
+extraMetadata:
+  main: dist-electron/main.js
