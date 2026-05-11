@@ -68,6 +68,32 @@ export interface QuotaCheckResult {
   error?: string
 }
 
+export interface VoiceCloneResult {
+  success: boolean
+  voiceId?: string
+  profileId?: number
+  error?: string
+}
+
+export interface AudioFileInfo {
+  fileName: string
+  sizeInMB: number
+  format: string
+  filePath: string
+}
+
+export interface AudioInfoResult {
+  success: boolean
+  info?: AudioFileInfo
+  error?: string
+}
+
+export interface CopyAudioResult {
+  success: boolean
+  filePath?: string
+  error?: string
+}
+
 export interface ElectronAPI {
   db: {
     getApiKeys: () => Promise<ApiKey[]>
@@ -93,6 +119,13 @@ export interface ElectronAPI {
     saveToFile: (audioData: number[], defaultName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>
     readFile: (filePath: string) => Promise<{ success: boolean; audioData?: number[]; error?: string }>
     cleanupTemp: () => Promise<{ success: boolean; deleted?: number; error?: string }>
+  }
+  voice: {
+    copyReferenceAudio: (sourcePath: string) => Promise<CopyAudioResult>
+    getAudioInfo: (filePath: string) => Promise<AudioInfoResult>
+    clone: (apiKeyRecord: ApiKey, cloneRequest: { name: string; referenceAudioPath: string; description?: string }) => Promise<VoiceCloneResult>
+    deleteProfile: (id: number) => Promise<{ success: boolean; error?: string }>
+    test: (apiKeyRecord: ApiKey, voiceId: string, text: string) => Promise<TTSGenerateResult>
   }
   getAppVersion: () => Promise<string>
   getDataPath: () => Promise<string>
