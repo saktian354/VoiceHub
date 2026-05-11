@@ -78,6 +78,7 @@ export interface ElectronAPI {
     testConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<TestConnectionResult>
     getUsageLogs: (limit?: number) => Promise<UsageLog[]>
     addUsageLog: (log: UsageLog) => Promise<{ changes: number; lastInsertRowid: number }>
+    deleteUsageLog: (id: number) => Promise<{ changes: number }>
     getVoiceProfiles: () => Promise<VoiceProfile[]>
     addVoiceProfile: (profile: VoiceProfile) => Promise<{ changes: number; lastInsertRowid: number }>
     deleteVoiceProfile: (id: number) => Promise<{ changes: number }>
@@ -86,6 +87,12 @@ export interface ElectronAPI {
     generate: (apiKeyRecord: ApiKey, ttsRequest: Record<string, unknown>) => Promise<TTSGenerateResult>
     getVoices: (apiKeyRecord: ApiKey) => Promise<TTSVoicesResult>
     checkQuota: (apiKeyRecord: ApiKey) => Promise<QuotaCheckResult>
+  }
+  audio: {
+    saveTempAudio: (audioData: number[], format: string) => Promise<{ success: boolean; filePath?: string; error?: string }>
+    saveToFile: (audioData: number[], defaultName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>
+    readFile: (filePath: string) => Promise<{ success: boolean; audioData?: number[]; error?: string }>
+    cleanupTemp: () => Promise<{ success: boolean; deleted?: number; error?: string }>
   }
   getAppVersion: () => Promise<string>
   getDataPath: () => Promise<string>
