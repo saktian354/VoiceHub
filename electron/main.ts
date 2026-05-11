@@ -548,6 +548,243 @@ function registerIpcHandlers(): void {
     return db.prepare('DELETE FROM usage_logs WHERE id = ?').run(id)
   })
 
+  // Voice Cloning Operations
+  ipcMain.handle('voice:copyReferenceAudio', (_event, sourcePath: string) => {
+    try {
+      const dataPath = getDataPath()
+      const refDir = path.join(dataPath, 'voice_references')
+      if (!fs.existsSync(refDir)) {
+        fs.mkdirSync(refDir, { recursive: true })
+      }
+      const ext = path.extname(sourcePath)
+      const baseName = path.basename(sourcePath, ext)
+      const destFilename = `${Date.now()}_${baseName}${ext}`
+      const destPath = path.join(refDir, destFilename)
+      fs.copyFileSync(sourcePath, destPath)
+      return { success: true, filePath: destPath }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('voice:getAudioInfo', (_event, filePath: string) => {
+    try {
+      if (!fs.existsSync(filePath)) return { success: false, error: 'File tidak ditemukan' }
+      const stat = fs.statSync(filePath)
+      const sizeInMB = stat.size / (1024 * 1024)
+      const ext = path.extname(filePath).toLowerCase().replace('.', '')
+      return {
+        success: true,
+        info: {
+          fileName: path.basename(filePath),
+          sizeInMB: Math.round(sizeInMB * 100) / 100,
+          format: ext,
+          filePath,
+        },
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('voice:clone', async (_event, apiKeyRecord, cloneRequest: { name: string; referenceAudioPath: string; description?: string }) => {
+    const provider = apiKeyRecord.provider_slug as string
+    const apiKey = apiKeyRecord.api_key as string
+
+    if (provider !== 'fishaudio' && provider !== 'elevenlabs') {
+      return { success: false, error: 'Provider ini tidak mendukung voice cloning. Gunakan Fish Audio atau ElevenLabs.' }
+    }
+
+    try {
+      const axios = require('axios')
+      const FormData = require('form-data')
+
+      if (!fs.existsSync(cloneRequest.referenceAudioPath)) {
+        return { success: false, error: 'File audio referensi tidak ditemukan.' }
+      }
+
+      const fileBuffer = fs.readFileSync(cloneRequest.referenceAudioPath)
+      const fileName = path.basename(cloneRequest.referenceAudioPath)
+
+      let voiceId = ''
+
+      if (provider === 'fishaudio') {
+        const form = new FormData()
+        form.append('visibility', 'private')
+        form.append('type', 'tts')
+        form.append('title', cloneRequest.name)
+        if (cloneRequest.description) {
+          form.append('description', cloneRequest.description)
+        }
+        form.append('voices', fileBuffer, { filename: fileName, contentType: 'audio/mpeg' })
+
+        const response = await axios.default.post('https://api.fish.audio/model', form, {
+          headers: {
+            ...form.getHeaders(),
+            Authorization: `Bearer ${apiKey}`,
+          },
+          timeout: 120000,
+        })
+
+        voiceId = String(response.data._id || response.data.id || '')
+      } else if (provider === 'elevenlabs') {
+        const form = new FormData()
+        form.append('name', cloneRequest.name)
+        if (cloneRequest.description) {
+          form.append('description', cloneRequest.description)
+        }
+        form.append('files', fileBuffer, { filename: fileName, contentType: 'audio/mpeg' })
+
+        const response = await axios.default.post('https://api.elevenlabs.io/v1/voices/add', form, {
+          headers: {
+            ...form.getHeaders(),
+            'xi-api-key': apiKey,
+          },
+          timeout: 120000,
+        })
+
+        voiceId = String(response.data.voice_id || '')
+      }
+
+      if (!voiceId) {
+        return { success: false, error: 'Gagal mendapatkan voice ID dari provider.' }
+      }
+
+      // Save voice profile to DB
+      const refResult = db.prepare(`
+        INSERT INTO voice_profiles (name, api_key_id, voice_id, reference_audio_path)
+        VALUES (?, ?, ?, ?)
+      `).run(cloneRequest.name, apiKeyRecord.id, voiceId, cloneRequest.referenceAudioPath)
+
+      // Log usage
+      db.prepare(`
+        INSERT INTO usage_logs (api_key_id, action, input_text, characters_used, duration_seconds, status)
+        VALUES (?, 'clone', ?, 0, 0, 'success')
+      `).run(apiKeyRecord.id, `Voice cloning: ${cloneRequest.name}`)
+
+      return {
+        success: true,
+        voiceId,
+        profileId: Number(refResult.lastInsertRowid),
+      }
+    } catch (error: unknown) {
+      // Log failure
+      db.prepare(`
+        INSERT INTO usage_logs (api_key_id, action, input_text, characters_used, duration_seconds, status)
+        VALUES (?, 'clone', ?, 0, 0, 'failed')
+      `).run(apiKeyRecord.id, `Voice cloning: ${cloneRequest.name}`)
+
+      const axiosError = error as { response?: { status?: number; data?: { detail?: { message?: string }; error?: string } }; code?: string; message?: string }
+      let errorMsg = 'Terjadi kesalahan saat cloning suara.'
+      if (axiosError.code === 'ECONNABORTED') {
+        errorMsg = 'Koneksi timeout. Proses cloning memakan waktu terlalu lama.'
+      } else if (axiosError.code === 'ERR_NETWORK' || !axiosError.response) {
+        errorMsg = 'Gagal terhubung ke server. Periksa koneksi internet Anda.'
+      } else {
+        const status = axiosError.response?.status
+        switch (status) {
+          case 401: errorMsg = 'API key tidak valid. Periksa kembali API key Anda.'; break
+          case 402: errorMsg = 'Kuota habis. Silakan upgrade paket atau tambah kredit.'; break
+          case 429: errorMsg = 'Terlalu banyak permintaan. Tunggu beberapa saat dan coba lagi.'; break
+          case 400: {
+            const detail = axiosError.response?.data?.detail?.message || axiosError.response?.data?.error || ''
+            errorMsg = `Request tidak valid: ${detail || 'Periksa file audio dan coba lagi.'}`
+            break
+          }
+          default: errorMsg = `Terjadi kesalahan (HTTP ${status}). Coba lagi nanti.`
+        }
+      }
+
+      return { success: false, error: errorMsg }
+    }
+  })
+
+  ipcMain.handle('voice:deleteProfile', (_event, id: number) => {
+    try {
+      // Get the profile first to find reference audio path
+      const profile = db.prepare('SELECT reference_audio_path FROM voice_profiles WHERE id = ?').get(id) as { reference_audio_path?: string } | undefined
+      if (profile?.reference_audio_path && fs.existsSync(profile.reference_audio_path)) {
+        try {
+          fs.unlinkSync(profile.reference_audio_path)
+        } catch {
+          // Ignore file deletion errors
+        }
+      }
+      db.prepare('DELETE FROM voice_profiles WHERE id = ?').run(id)
+      return { success: true }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, error: message }
+    }
+  })
+
+  ipcMain.handle('voice:test', async (_event, apiKeyRecord, voiceId: string, text: string) => {
+    try {
+      const axios = require('axios')
+      const provider = apiKeyRecord.provider_slug as string
+      const apiKey = apiKeyRecord.api_key as string
+      const baseUrl = apiKeyRecord.base_url as string | undefined
+      const startTime = Date.now()
+
+      let url: string
+      let headers: Record<string, string> = {}
+      let body: Record<string, unknown>
+
+      switch (provider) {
+        case 'fishaudio':
+          url = 'https://api.fish.audio/v1/tts'
+          headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+          body = { text, reference_id: voiceId, format: 'mp3', latency: 'normal' }
+          break
+        case 'elevenlabs':
+          url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`
+          headers = { 'xi-api-key': apiKey, Accept: 'audio/mpeg' }
+          body = { text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }
+          break
+        case 'ttsai':
+          url = 'https://api.tts.ai/v1/tts'
+          headers = { Authorization: `Bearer ${apiKey}` }
+          body = { text, voice_id: voiceId, speed: 1.0, output_format: 'mp3' }
+          break
+        default:
+          url = `${baseUrl || ''}/v1/audio/speech`
+          headers = { Authorization: `Bearer ${apiKey}` }
+          body = { model: 'tts-1', input: text, voice: voiceId, speed: 1.0, response_format: 'mp3' }
+          break
+      }
+
+      const response = await axios.default.post(url, body, {
+        headers,
+        responseType: 'arraybuffer',
+        timeout: 30000,
+      })
+
+      const durationSeconds = (Date.now() - startTime) / 1000
+      const audioArray = Array.from(new Uint8Array(response.data))
+
+      // Log usage
+      db.prepare(`
+        INSERT INTO usage_logs (api_key_id, action, input_text, characters_used, duration_seconds, status)
+        VALUES (?, 'tts', ?, ?, ?, 'success')
+      `).run(apiKeyRecord.id, text, text.length, durationSeconds)
+
+      return { success: true, audioData: audioArray, charactersUsed: text.length }
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { status?: number }; code?: string; message?: string }
+      let errorMsg = 'Gagal menghasilkan audio test.'
+      if (axiosError.response?.status === 401) {
+        errorMsg = 'API key tidak valid.'
+      } else if (axiosError.code === 'ERR_NETWORK') {
+        errorMsg = 'Gagal terhubung ke server.'
+      } else if (axiosError.response?.status === 402) {
+        errorMsg = 'Kuota habis.'
+      }
+      return { success: false, error: errorMsg }
+    }
+  })
+
   // File dialogs
   ipcMain.handle('dialog:selectFile', async (_event, filters) => {
     const result = await dialog.showOpenDialog(mainWindow!, {

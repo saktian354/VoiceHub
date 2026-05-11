@@ -75,6 +75,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cleanupTemp: () => ipcRenderer.invoke('audio:cleanupTemp'),
   },
 
+  // Voice Cloning
+  voice: {
+    copyReferenceAudio: (sourcePath: string) =>
+      ipcRenderer.invoke('voice:copyReferenceAudio', sourcePath),
+    getAudioInfo: (filePath: string) =>
+      ipcRenderer.invoke('voice:getAudioInfo', filePath),
+    clone: (apiKeyRecord: ApiKey, cloneRequest: { name: string; referenceAudioPath: string; description?: string }) =>
+      ipcRenderer.invoke('voice:clone', apiKeyRecord, cloneRequest),
+    deleteProfile: (id: number) =>
+      ipcRenderer.invoke('voice:deleteProfile', id),
+    test: (apiKeyRecord: ApiKey, voiceId: string, text: string) =>
+      ipcRenderer.invoke('voice:test', apiKeyRecord, voiceId, text),
+  },
+
   // App info
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
