@@ -4,12 +4,14 @@ import { Dashboard } from '@/pages/Dashboard'
 import { ApiManager } from '@/pages/ApiManager'
 import { TextToSpeech } from '@/pages/TextToSpeech'
 import { VoiceCloning } from '@/pages/VoiceCloning'
+import { Settings } from '@/pages/Settings'
 
 const pages: Record<string, React.ComponentType> = {
   dashboard: Dashboard,
   'api-manager': ApiManager,
   'text-to-speech': TextToSpeech,
   'voice-cloning': VoiceCloning,
+  settings: Settings,
 }
 
 export function MainLayout() {

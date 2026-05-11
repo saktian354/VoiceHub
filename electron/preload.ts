@@ -95,6 +95,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getChartData: () => ipcRenderer.invoke('dashboard:getChartData'),
   },
 
+  // Settings
+  settings: {
+    getAll: () => ipcRenderer.invoke('settings:getAll'),
+    set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
+    clearHistory: () => ipcRenderer.invoke('settings:clearHistory'),
+  },
+
+  // Auto-Switch
+  getNextAvailableApi: (currentApiId: number) =>
+    ipcRenderer.invoke('tts:getNextAvailableApi', currentApiId),
+
   // App info
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
@@ -102,4 +113,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File dialogs
   selectFile: (filters?: Electron.FileFilter[]) => ipcRenderer.invoke('dialog:selectFile', filters),
   saveFile: (defaultName: string) => ipcRenderer.invoke('dialog:saveFile', defaultName),
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder'),
 })

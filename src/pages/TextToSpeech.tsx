@@ -164,6 +164,22 @@ export function TextToSpeech() {
     )
   }, [voices, voiceSearch])
 
+  const isAutoSwitchError = (errorMsg?: string): boolean => {
+    if (!errorMsg) return false
+    const lower = errorMsg.toLowerCase()
+    return (
+      lower.includes('quota') ||
+      lower.includes('kuota') ||
+      lower.includes('402') ||
+      lower.includes('429') ||
+      lower.includes('rate limit') ||
+      lower.includes('401') ||
+      lower.includes('tidak valid') ||
+      lower.includes('invalid') ||
+      lower.includes('unauthorized')
+    )
+  }
+
   const handleGenerate = async () => {
     if (!text.trim() || !selectedKey || !selectedVoiceId) return
 
@@ -172,42 +188,70 @@ export function TextToSpeech() {
     setAudioData(null)
     setGenerateInfo(null)
 
-    try {
-      const result = await window.electronAPI.tts.generate(selectedKey, {
-        text: text.trim(),
-        voiceId: selectedVoiceId,
-        speed,
-        pitch,
-        outputFormat,
-        language: language || undefined,
-      })
+    let currentApi: ApiKey = selectedKey
+    let attempts = 0
+    const maxAttempts = activeKeys.length
 
-      if (result.success && result.audioData) {
-        setAudioData(result.audioData)
-        const blob = new Blob([new Uint8Array(result.audioData)], {
-          type: outputFormat === 'wav' ? 'audio/wav' : 'audio/mpeg',
-        })
-        const url = URL.createObjectURL(blob)
-        setAudioUrl(url)
-        setGenerateInfo({
-          provider: selectedKey.provider_name,
-          chars: result.charactersUsed,
-          duration: 0,
+    while (attempts < maxAttempts) {
+      try {
+        const result = await window.electronAPI.tts.generate(currentApi, {
+          text: text.trim(),
+          voiceId: selectedVoiceId,
+          speed,
+          pitch,
+          outputFormat,
+          language: language || undefined,
         })
 
-        window.electronAPI.audio.saveTempAudio(result.audioData, outputFormat)
-        showToast('success', `Audio berhasil dibuat! (${result.charactersUsed} karakter)`)
-      } else {
+        if (result.success && result.audioData) {
+          setAudioData(result.audioData)
+          const blob = new Blob([new Uint8Array(result.audioData)], {
+            type: outputFormat === 'wav' ? 'audio/wav' : 'audio/mpeg',
+          })
+          const url = URL.createObjectURL(blob)
+          setAudioUrl(url)
+          setGenerateInfo({
+            provider: currentApi.provider_name,
+            chars: result.charactersUsed,
+            duration: 0,
+          })
+
+          window.electronAPI.audio.saveTempAudio(result.audioData, outputFormat)
+          showToast('success', `Audio berhasil dibuat! (${result.charactersUsed} karakter)`)
+          break
+        }
+
+        if (isAutoSwitchError(result.error) && currentApi.id !== undefined) {
+          const settings = await window.electronAPI.settings.getAll()
+          if (settings.auto_switch_api === 'true') {
+            const nextApi = await window.electronAPI.getNextAvailableApi(currentApi.id)
+            if (nextApi) {
+              showToast(
+                'info',
+                `Auto-switch: Beralih dari ${currentApi.label || currentApi.provider_name} ke ${nextApi.label || nextApi.provider_name} karena ${result.error}`
+              )
+              currentApi = nextApi
+              attempts++
+              continue
+            }
+          }
+        }
+
         showToast('error', `Gagal: ${result.error || 'Terjadi kesalahan.'}`)
+        break
+      } catch {
+        showToast('error', 'Gagal generate audio. Coba lagi.')
+        break
       }
-
-      await loadUsageLogs()
-      await fetchApiKeys()
-    } catch {
-      showToast('error', 'Gagal generate audio. Coba lagi.')
-    } finally {
-      setIsGenerating(false)
     }
+
+    if (attempts >= maxAttempts) {
+      showToast('error', 'Semua API tidak tersedia. Coba lagi nanti.')
+    }
+
+    await loadUsageLogs()
+    await fetchApiKeys()
+    setIsGenerating(false)
   }
 
   const handleDownload = async () => {

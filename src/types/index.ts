@@ -119,6 +119,22 @@ export interface ChartDataPoint {
   generates: number
 }
 
+export interface AppSettings {
+  theme: string
+  language: string
+  save_history: string
+  history_retention: string
+  audio_format: string
+  audio_quality: string
+  audio_output_folder?: string
+  auto_save_audio: string
+  auto_switch_api: string
+  request_timeout: string
+  auto_retry: string
+  retry_count: string
+  [key: string]: string | undefined
+}
+
 export interface ElectronAPI {
   db: {
     getApiKeys: () => Promise<ApiKey[]>
@@ -156,10 +172,17 @@ export interface ElectronAPI {
     getStats: () => Promise<DashboardStats>
     getChartData: () => Promise<ChartDataPoint[]>
   }
+  settings: {
+    getAll: () => Promise<AppSettings>
+    set: (key: string, value: string) => Promise<{ success: boolean }>
+    clearHistory: () => Promise<{ success: boolean }>
+  }
+  getNextAvailableApi: (currentApiId: number) => Promise<ApiKey | null>
   getAppVersion: () => Promise<string>
   getDataPath: () => Promise<string>
   selectFile: (filters?: { name: string; extensions: string[] }[]) => Promise<string | null>
   saveFile: (defaultName: string) => Promise<string | null>
+  selectFolder: () => Promise<string | null>
 }
 
 declare global {

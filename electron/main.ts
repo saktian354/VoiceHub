@@ -258,6 +258,45 @@ function registerIpcHandlers(): void {
     return days
   })
 
+  // Settings
+  ipcMain.handle('settings:getAll', () => {
+    const rows = db.prepare('SELECT key, value FROM settings').all() as Array<{ key: string; value: string }>
+    const result: Record<string, string> = {}
+    for (const row of rows) {
+      result[row.key] = row.value
+    }
+    return result
+  })
+
+  ipcMain.handle('settings:set', (_event, key: string, value: string) => {
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value)
+    return { success: true }
+  })
+
+  ipcMain.handle('settings:clearHistory', (_event) => {
+    db.prepare('DELETE FROM usage_logs').run()
+    return { success: true }
+  })
+
+  ipcMain.handle('dialog:selectFolder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory'],
+    })
+    if (result.canceled) return null
+    return result.filePaths[0]
+  })
+
+  // Auto-Switch: get next available API
+  ipcMain.handle('tts:getNextAvailableApi', (_event, currentApiId: number) => {
+    const candidates = db.prepare(
+      `SELECT * FROM api_keys
+       WHERE is_active = 1 AND id != ?
+       AND (quota_total = 0 OR quota_used < quota_total)
+       ORDER BY is_primary DESC, quota_used ASC`
+    ).all(currentApiId)
+    return candidates.length > 0 ? candidates[0] : null
+  })
+
   // App info
   ipcMain.handle('app:getVersion', () => {
     return app.getVersion()
