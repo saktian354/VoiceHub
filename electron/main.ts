@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, net } from 'electron'
 import path from 'path'
 import { getDatabase, closeDatabase } from './db'
 
@@ -62,7 +62,74 @@ function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('db:deleteApiKey', (_event, id: number) => {
-    return db.prepare('DELETE FROM api_keys WHERE id = ?').run(id)
+    const result = db.prepare('DELETE FROM api_keys WHERE id = ?').run(id)
+    const wasPrimary = db.prepare('SELECT COUNT(*) as cnt FROM api_keys WHERE is_primary = 1').get() as { cnt: number }
+    if (wasPrimary.cnt === 0) {
+      const firstActive = db.prepare('SELECT id FROM api_keys WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1').get() as { id: number } | undefined
+      if (firstActive) {
+        db.prepare('UPDATE api_keys SET is_primary = 1 WHERE id = ?').run(firstActive.id)
+      }
+    }
+    return result
+  })
+
+  ipcMain.handle('db:setPrimary', (_event, id: number) => {
+    db.prepare('UPDATE api_keys SET is_primary = 0').run()
+    db.prepare('UPDATE api_keys SET is_primary = 1 WHERE id = ?').run(id)
+    return { success: true }
+  })
+
+  ipcMain.handle('db:testConnection', async (_event, provider: string, apiKey: string, baseUrl?: string) => {
+    try {
+      let url: string
+      const headers: Record<string, string> = {}
+
+      switch (provider) {
+        case 'ttsai':
+          url = 'https://api.tts.ai/v1/voices'
+          headers['Authorization'] = `Bearer ${apiKey}`
+          break
+        case 'fishaudio':
+          url = 'https://api.fish.audio/model'
+          headers['Authorization'] = `Bearer ${apiKey}`
+          break
+        case 'elevenlabs':
+          url = 'https://api.elevenlabs.io/v1/user'
+          headers['xi-api-key'] = apiKey
+          break
+        case 'custom':
+          if (!baseUrl) return { success: false, message: 'Base URL is required for custom provider' }
+          url = baseUrl
+          headers['Authorization'] = `Bearer ${apiKey}`
+          break
+        default:
+          return { success: false, message: `Unknown provider: ${provider}` }
+      }
+
+      return new Promise<{ success: boolean; message: string }>((resolve) => {
+        const request = net.request({ url, method: 'GET' })
+        Object.entries(headers).forEach(([key, value]) => {
+          request.setHeader(key, value)
+        })
+
+        request.on('response', (response) => {
+          if (response.statusCode >= 200 && response.statusCode < 300) {
+            resolve({ success: true, message: 'Connection successful' })
+          } else {
+            resolve({ success: false, message: `HTTP ${response.statusCode}: ${response.statusMessage || 'Request failed'}` })
+          }
+        })
+
+        request.on('error', (error) => {
+          resolve({ success: false, message: error.message })
+        })
+
+        request.end()
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return { success: false, message }
+    }
   })
 
   // Usage Logs

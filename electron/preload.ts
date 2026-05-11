@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     addApiKey: (key: ApiKey) => ipcRenderer.invoke('db:addApiKey', key),
     updateApiKey: (id: number, key: Partial<ApiKey>) => ipcRenderer.invoke('db:updateApiKey', id, key),
     deleteApiKey: (id: number) => ipcRenderer.invoke('db:deleteApiKey', id),
+    setPrimary: (id: number) => ipcRenderer.invoke('db:setPrimary', id),
+    testConnection: (provider: string, apiKey: string, baseUrl?: string) =>
+      ipcRenderer.invoke('db:testConnection', provider, apiKey, baseUrl),
 
     getUsageLogs: (limit?: number) => ipcRenderer.invoke('db:getUsageLogs', limit),
     addUsageLog: (log: UsageLog) => ipcRenderer.invoke('db:addUsageLog', log),

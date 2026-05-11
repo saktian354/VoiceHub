@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ApiKey, UsageLog, VoiceProfile } from '@/types'
+import type { ApiKey, UsageLog, VoiceProfile, TestConnectionResult } from '@/types'
 
 interface AppState {
   // Sidebar
@@ -13,7 +13,12 @@ interface AppState {
   // API Keys
   apiKeys: ApiKey[]
   setApiKeys: (keys: ApiKey[]) => void
-  loadApiKeys: () => Promise<void>
+  fetchApiKeys: () => Promise<void>
+  addApiKey: (key: ApiKey) => Promise<void>
+  updateApiKey: (id: number, data: Partial<ApiKey>) => Promise<void>
+  deleteApiKey: (id: number) => Promise<void>
+  setPrimary: (id: number) => Promise<void>
+  testConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<TestConnectionResult>
 
   // Usage Logs
   usageLogs: UsageLog[]
@@ -26,7 +31,7 @@ interface AppState {
   loadVoiceProfiles: () => Promise<void>
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   // Sidebar
   sidebarCollapsed: false,
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -38,11 +43,47 @@ export const useAppStore = create<AppState>((set) => ({
   // API Keys
   apiKeys: [],
   setApiKeys: (keys: ApiKey[]) => set({ apiKeys: keys }),
-  loadApiKeys: async () => {
+
+  fetchApiKeys: async () => {
     if (window.electronAPI) {
       const keys = await window.electronAPI.db.getApiKeys()
       set({ apiKeys: keys })
     }
+  },
+
+  addApiKey: async (key: ApiKey) => {
+    if (window.electronAPI) {
+      await window.electronAPI.db.addApiKey(key)
+      await get().fetchApiKeys()
+    }
+  },
+
+  updateApiKey: async (id: number, data: Partial<ApiKey>) => {
+    if (window.electronAPI) {
+      await window.electronAPI.db.updateApiKey(id, data)
+      await get().fetchApiKeys()
+    }
+  },
+
+  deleteApiKey: async (id: number) => {
+    if (window.electronAPI) {
+      await window.electronAPI.db.deleteApiKey(id)
+      await get().fetchApiKeys()
+    }
+  },
+
+  setPrimary: async (id: number) => {
+    if (window.electronAPI) {
+      await window.electronAPI.db.setPrimary(id)
+      await get().fetchApiKeys()
+    }
+  },
+
+  testConnection: async (provider: string, apiKey: string, baseUrl?: string) => {
+    if (window.electronAPI) {
+      return window.electronAPI.db.testConnection(provider, apiKey, baseUrl)
+    }
+    return { success: false, message: 'Electron API not available' }
   },
 
   // Usage Logs
