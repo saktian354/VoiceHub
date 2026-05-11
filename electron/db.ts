@@ -70,7 +70,32 @@ function initializeTables(db: Database.Database): void {
       reference_audio_path TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
+
+  // Insert default settings if not present
+  const defaults: Record<string, string> = {
+    theme: 'dark',
+    language: 'id',
+    save_history: 'true',
+    history_retention: 'forever',
+    audio_format: 'mp3',
+    audio_quality: 'standard',
+    auto_save_audio: 'true',
+    auto_switch_api: 'true',
+    request_timeout: '30',
+    auto_retry: 'true',
+    retry_count: '2',
+  }
+
+  const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
+  for (const [key, value] of Object.entries(defaults)) {
+    insertSetting.run(key, value)
+  }
 }
 
 export function closeDatabase(): void {

@@ -1,17 +1,17 @@
 import { useEffect, useState, useCallback, type ReactNode } from 'react'
-import { CheckCircle2, XCircle, X } from 'lucide-react'
+import { CheckCircle2, XCircle, X, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Toast {
   id: number
-  type: 'success' | 'error'
+  type: 'success' | 'error' | 'info'
   message: string
 }
 
 let toastId = 0
 let addToastFn: ((toast: Omit<Toast, 'id'>) => void) | null = null
 
-export function showToast(type: 'success' | 'error', message: string) {
+export function showToast(type: 'success' | 'error' | 'info', message: string) {
   addToastFn?.({ type, message })
 }
 
@@ -27,11 +27,15 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
         'flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-right-full',
         toast.type === 'success'
           ? 'bg-green-500/10 border-green-500/20 text-green-400'
+          : toast.type === 'info'
+          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
           : 'bg-red-500/10 border-red-500/20 text-red-400'
       )}
     >
       {toast.type === 'success' ? (
         <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+      ) : toast.type === 'info' ? (
+        <Zap className="w-4 h-4 flex-shrink-0" />
       ) : (
         <XCircle className="w-4 h-4 flex-shrink-0" />
       )}

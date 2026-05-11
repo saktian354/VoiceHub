@@ -3,6 +3,7 @@ import {
   Key,
   MessageSquareText,
   AudioLines,
+  Settings,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const navItems: NavItem[] = [
   { id: 'api-manager', label: 'API Manager', icon: Key },
   { id: 'text-to-speech', label: 'Text to Speech', icon: MessageSquareText },
   { id: 'voice-cloning', label: 'Voice Cloning', icon: AudioLines },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export function Sidebar() {
