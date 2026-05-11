@@ -4,19 +4,19 @@ import { Key, MessageSquareText, AudioLines, Activity } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 
 export function Dashboard() {
-  const { apiKeys, usageLogs, voiceProfiles, loadApiKeys, loadUsageLogs, loadVoiceProfiles } =
+  const { apiKeys, usageLogs, voiceProfiles, fetchApiKeys, loadUsageLogs, loadVoiceProfiles } =
     useAppStore()
   const [dataPath, setDataPath] = useState<string>('')
 
   useEffect(() => {
-    loadApiKeys()
+    fetchApiKeys()
     loadUsageLogs()
     loadVoiceProfiles()
 
     if (window.electronAPI) {
       window.electronAPI.getDataPath().then(setDataPath)
     }
-  }, [loadApiKeys, loadUsageLogs, loadVoiceProfiles])
+  }, [fetchApiKeys, loadUsageLogs, loadVoiceProfiles])
 
   const stats = [
     {

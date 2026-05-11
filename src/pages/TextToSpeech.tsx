@@ -5,15 +5,15 @@ import { Play, Download, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 
 export function TextToSpeech() {
-  const { apiKeys, loadApiKeys } = useAppStore()
+  const { apiKeys, fetchApiKeys } = useAppStore()
   const [text, setText] = useState('')
   const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    loadApiKeys()
-  }, [loadApiKeys])
+    fetchApiKeys()
+  }, [fetchApiKeys])
 
   useEffect(() => {
     const primary = apiKeys.find((k) => k.is_primary && k.is_active)

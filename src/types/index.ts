@@ -3,12 +3,13 @@ export interface ApiKey {
   provider_name: string
   provider_slug: string
   api_key: string
+  base_url?: string
   label?: string
   quota_total?: number
   quota_used?: number
   quota_unit?: string
-  is_active?: boolean
-  is_primary?: boolean
+  is_active?: boolean | number
+  is_primary?: boolean | number
   created_at?: string
 }
 
@@ -35,12 +36,19 @@ export interface VoiceProfile {
   provider_name?: string
 }
 
+export interface TestConnectionResult {
+  success: boolean
+  message: string
+}
+
 export interface ElectronAPI {
   db: {
     getApiKeys: () => Promise<ApiKey[]>
     addApiKey: (key: ApiKey) => Promise<{ changes: number; lastInsertRowid: number }>
     updateApiKey: (id: number, key: Partial<ApiKey>) => Promise<{ changes: number }>
     deleteApiKey: (id: number) => Promise<{ changes: number }>
+    setPrimary: (id: number) => Promise<{ success: boolean }>
+    testConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<TestConnectionResult>
     getUsageLogs: (limit?: number) => Promise<UsageLog[]>
     addUsageLog: (log: UsageLog) => Promise<{ changes: number; lastInsertRowid: number }>
     getVoiceProfiles: () => Promise<VoiceProfile[]>

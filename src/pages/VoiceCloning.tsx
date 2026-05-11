@@ -6,7 +6,7 @@ import { Upload, Trash2, AudioLines, Loader2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 
 export function VoiceCloning() {
-  const { apiKeys, voiceProfiles, loadApiKeys, loadVoiceProfiles } = useAppStore()
+  const { apiKeys, voiceProfiles, fetchApiKeys, loadVoiceProfiles } = useAppStore()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null)
@@ -14,9 +14,9 @@ export function VoiceCloning() {
   const [isCloning, setIsCloning] = useState(false)
 
   useEffect(() => {
-    loadApiKeys()
+    fetchApiKeys()
     loadVoiceProfiles()
-  }, [loadApiKeys, loadVoiceProfiles])
+  }, [fetchApiKeys, loadVoiceProfiles])
 
   const activeKeys = apiKeys.filter((k) => k.is_active)
 
