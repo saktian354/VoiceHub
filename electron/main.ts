@@ -187,6 +187,77 @@ function registerIpcHandlers(): void {
     return db.prepare('DELETE FROM voice_profiles WHERE id = ?').run(id)
   })
 
+  // Dashboard
+  ipcMain.handle('dashboard:getStats', () => {
+    const today = new Date().toISOString().slice(0, 10)
+    const now = new Date()
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+
+    const todayGenerates = db.prepare(
+      `SELECT COUNT(*) as count FROM usage_logs WHERE DATE(timestamp) = ? AND status = 'success'`
+    ).get(today) as { count: number }
+
+    const monthChars = db.prepare(
+      `SELECT COALESCE(SUM(characters_used), 0) as total FROM usage_logs WHERE DATE(timestamp) >= ? AND status = 'success'`
+    ).get(firstOfMonth) as { total: number }
+
+    const activeKeys = db.prepare(
+      `SELECT COUNT(*) as count FROM api_keys WHERE is_active = 1`
+    ).get() as { count: number }
+
+    const profileCount = db.prepare(
+      `SELECT COUNT(*) as count FROM voice_profiles`
+    ).get() as { count: number }
+
+    const recentLogs = db.prepare(
+      `SELECT ul.*, ak.provider_name, ak.label as api_label
+       FROM usage_logs ul
+       LEFT JOIN api_keys ak ON ul.api_key_id = ak.id
+       ORDER BY ul.timestamp DESC
+       LIMIT 5`
+    ).all()
+
+    const apiKeysStatus = db.prepare(
+      `SELECT id, label, provider_name, provider_slug, quota_total, quota_used, quota_unit, is_active
+       FROM api_keys ORDER BY created_at DESC`
+    ).all()
+
+    return {
+      todayGenerates: todayGenerates.count,
+      monthCharacters: monthChars.total,
+      activeApiKeys: activeKeys.count,
+      voiceProfileCount: profileCount.count,
+      recentLogs,
+      apiKeysStatus,
+    }
+  })
+
+  ipcMain.handle('dashboard:getChartData', () => {
+    const days: Array<{ date: string; dayLabel: string; characters: number; generates: number }> = []
+    const dayLabels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toISOString().slice(0, 10)
+      const dayLabel = dayLabels[d.getDay()]
+
+      const row = db.prepare(
+        `SELECT COALESCE(SUM(characters_used), 0) as characters, COUNT(*) as generates
+         FROM usage_logs WHERE DATE(timestamp) = ? AND status = 'success'`
+      ).get(dateStr) as { characters: number; generates: number }
+
+      days.push({
+        date: dateStr,
+        dayLabel,
+        characters: row.characters,
+        generates: row.generates,
+      })
+    }
+
+    return days
+  })
+
   // App info
   ipcMain.handle('app:getVersion', () => {
     return app.getVersion()

@@ -94,6 +94,31 @@ export interface CopyAudioResult {
   error?: string
 }
 
+export interface DashboardStats {
+  todayGenerates: number
+  monthCharacters: number
+  activeApiKeys: number
+  voiceProfileCount: number
+  recentLogs: UsageLog[]
+  apiKeysStatus: Array<{
+    id: number
+    label: string
+    provider_name: string
+    provider_slug: string
+    quota_total: number
+    quota_used: number
+    quota_unit: string
+    is_active: number | boolean
+  }>
+}
+
+export interface ChartDataPoint {
+  date: string
+  dayLabel: string
+  characters: number
+  generates: number
+}
+
 export interface ElectronAPI {
   db: {
     getApiKeys: () => Promise<ApiKey[]>
@@ -126,6 +151,10 @@ export interface ElectronAPI {
     clone: (apiKeyRecord: ApiKey, cloneRequest: { name: string; referenceAudioPath: string; description?: string }) => Promise<VoiceCloneResult>
     deleteProfile: (id: number) => Promise<{ success: boolean; error?: string }>
     test: (apiKeyRecord: ApiKey, voiceId: string, text: string) => Promise<TTSGenerateResult>
+  }
+  dashboard: {
+    getStats: () => Promise<DashboardStats>
+    getChartData: () => Promise<ChartDataPoint[]>
   }
   getAppVersion: () => Promise<string>
   getDataPath: () => Promise<string>
