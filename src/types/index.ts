@@ -41,6 +41,33 @@ export interface TestConnectionResult {
   message: string
 }
 
+export interface TTSGenerateResult {
+  success: boolean
+  audioData?: number[]
+  charactersUsed: number
+  error?: string
+}
+
+export interface TTSVoice {
+  id: string
+  name: string
+  language: string
+  gender: string
+  preview_url?: string
+}
+
+export interface TTSVoicesResult {
+  success: boolean
+  voices: TTSVoice[]
+  error?: string
+}
+
+export interface QuotaCheckResult {
+  success: boolean
+  quota?: { used: number; total: number; unit: string }
+  error?: string
+}
+
 export interface ElectronAPI {
   db: {
     getApiKeys: () => Promise<ApiKey[]>
@@ -54,6 +81,11 @@ export interface ElectronAPI {
     getVoiceProfiles: () => Promise<VoiceProfile[]>
     addVoiceProfile: (profile: VoiceProfile) => Promise<{ changes: number; lastInsertRowid: number }>
     deleteVoiceProfile: (id: number) => Promise<{ changes: number }>
+  }
+  tts: {
+    generate: (apiKeyRecord: ApiKey, ttsRequest: Record<string, unknown>) => Promise<TTSGenerateResult>
+    getVoices: (apiKeyRecord: ApiKey) => Promise<TTSVoicesResult>
+    checkQuota: (apiKeyRecord: ApiKey) => Promise<QuotaCheckResult>
   }
   getAppVersion: () => Promise<string>
   getDataPath: () => Promise<string>
