@@ -53,6 +53,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteVoiceProfile: (id: number) => ipcRenderer.invoke('db:deleteVoiceProfile', id),
   },
 
+  // TTS Operations
+  tts: {
+    generate: (apiKeyRecord: ApiKey, ttsRequest: Record<string, unknown>) =>
+      ipcRenderer.invoke('tts:generate', apiKeyRecord, ttsRequest),
+    getVoices: (apiKeyRecord: ApiKey) =>
+      ipcRenderer.invoke('tts:getVoices', apiKeyRecord),
+    checkQuota: (apiKeyRecord: ApiKey) =>
+      ipcRenderer.invoke('api:checkQuota', apiKeyRecord),
+  },
+
   // App info
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
