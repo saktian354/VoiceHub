@@ -13,7 +13,12 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["voicehub", "tts", "voice-cloning", "electron"],
+  "keywords": [
+    "voicehub",
+    "tts",
+    "voice-cloning",
+    "electron"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -24,6 +29,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.1",
+    "recharts": "^3.8.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {

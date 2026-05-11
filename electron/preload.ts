@@ -89,6 +89,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('voice:test', apiKeyRecord, voiceId, text),
   },
 
+  // Dashboard
+  dashboard: {
+    getStats: () => ipcRenderer.invoke('dashboard:getStats'),
+    getChartData: () => ipcRenderer.invoke('dashboard:getChartData'),
+  },
+
   // App info
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
   getDataPath: () => ipcRenderer.invoke('app:getDataPath'),
