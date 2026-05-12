@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import path from 'path'
+import fs from 'fs'
 import { app } from 'electron'
 
 let db: Database.Database | null = null
@@ -19,7 +20,6 @@ export function getDatabase(): Database.Database {
   if (db) return db
 
   const dataDir = getPortablePath()
-  const fs = require('fs')
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true })
   }
