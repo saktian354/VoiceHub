@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog, net } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import axios from 'axios'
+import FormData from 'form-data'
 import { getDatabase, closeDatabase } from './db'
 
 let mainWindow: BrowserWindow | null = null
@@ -313,7 +315,6 @@ function registerIpcHandlers(): void {
     const baseUrl = apiKeyRecord.base_url as string | undefined
 
     try {
-      const axios = require('axios')
       const startTime = Date.now()
 
       let url: string
@@ -365,7 +366,7 @@ function registerIpcHandlers(): void {
           break
       }
 
-      const response = await axios.default.post(url, body, {
+      const response = await axios.post(url, body, {
         headers,
         responseType,
         timeout: 30000,
@@ -432,7 +433,6 @@ function registerIpcHandlers(): void {
     const baseUrl = apiKeyRecord.base_url as string | undefined
 
     try {
-      const axios = require('axios')
       let url: string
       const headers: Record<string, string> = {}
 
@@ -455,7 +455,7 @@ function registerIpcHandlers(): void {
           break
       }
 
-      const response = await axios.default.get(url, { headers, timeout: 30000 })
+      const response = await axios.get(url, { headers, timeout: 30000 })
       const data = response.data
 
       let voices: Array<{ id: string; name: string; language: string; gender: string; preview_url?: string }> = []
@@ -511,7 +511,6 @@ function registerIpcHandlers(): void {
     const baseUrl = apiKeyRecord.base_url as string | undefined
 
     try {
-      const axios = require('axios')
       let url: string
       const headers: Record<string, string> = {}
 
@@ -534,7 +533,7 @@ function registerIpcHandlers(): void {
           break
       }
 
-      const response = await axios.default.get(url, { headers, timeout: 30000 })
+      const response = await axios.get(url, { headers, timeout: 30000 })
       const data = response.data
 
       let used = 0
@@ -708,9 +707,6 @@ function registerIpcHandlers(): void {
     }
 
     try {
-      const axios = require('axios')
-      const FormData = require('form-data')
-
       if (!fs.existsSync(cloneRequest.referenceAudioPath)) {
         return { success: false, error: 'File audio referensi tidak ditemukan.' }
       }
@@ -730,7 +726,7 @@ function registerIpcHandlers(): void {
         }
         form.append('voices', fileBuffer, { filename: fileName, contentType: 'audio/mpeg' })
 
-        const response = await axios.default.post('https://api.fish.audio/model', form, {
+        const response = await axios.post('https://api.fish.audio/model', form, {
           headers: {
             ...form.getHeaders(),
             Authorization: `Bearer ${apiKey}`,
@@ -747,7 +743,7 @@ function registerIpcHandlers(): void {
         }
         form.append('files', fileBuffer, { filename: fileName, contentType: 'audio/mpeg' })
 
-        const response = await axios.default.post('https://api.elevenlabs.io/v1/voices/add', form, {
+        const response = await axios.post('https://api.elevenlabs.io/v1/voices/add', form, {
           headers: {
             ...form.getHeaders(),
             'xi-api-key': apiKey,
@@ -832,7 +828,6 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('voice:test', async (_event, apiKeyRecord, voiceId: string, text: string) => {
     try {
-      const axios = require('axios')
       const provider = apiKeyRecord.provider_slug as string
       const apiKey = apiKeyRecord.api_key as string
       const baseUrl = apiKeyRecord.base_url as string | undefined
@@ -865,7 +860,7 @@ function registerIpcHandlers(): void {
           break
       }
 
-      const response = await axios.default.post(url, body, {
+      const response = await axios.post(url, body, {
         headers,
         responseType: 'arraybuffer',
         timeout: 30000,
