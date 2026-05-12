@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { ApiKeyGuide } from '@/components/ui/api-key-guide'
 import {
   Plus,
   Trash2,
@@ -17,6 +18,7 @@ import {
   XCircle,
   Key,
   Wifi,
+  HelpCircle,
 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import type { ApiKey } from '@/types'
@@ -75,6 +77,7 @@ export function ApiManager() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [isTesting, setIsTesting] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
 
   useEffect(() => {
     fetchApiKeys()
@@ -183,10 +186,16 @@ export function ApiManager() {
           <h1 className="text-2xl font-bold text-white">API Manager</h1>
           <p className="text-gray-400 mt-1">Manage your API keys and quotas</p>
         </div>
-        <Button onClick={openAddModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add API Key
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => setGuideOpen(true)}>
+            <HelpCircle className="w-4 h-4 mr-2" />
+            Cara Dapat API Key
+          </Button>
+          <Button onClick={openAddModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add API Key
+          </Button>
+        </div>
       </div>
 
       {/* Empty State */}
@@ -479,6 +488,9 @@ export function ApiManager() {
         confirmLabel="Delete"
         isDestructive
       />
+
+      {/* API Key Guide */}
+      <ApiKeyGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   )
 }
