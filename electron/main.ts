@@ -9,6 +9,50 @@ import { getDatabase, closeDatabase } from './db'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// TTS.ai uses an asynchronous queue API: POST /v1/tts/ returns a job uuid,
+// then the caller polls /v1/speech/results/?uuid= and downloads result_url
+// once status is "completed". See https://tts.ai/api/
+async function generateAudioViaTTSAi(
+  apiKey: string,
+  body: Record<string, unknown>
+): Promise<number[]> {
+  const submitResp = await axios.post('https://api.tts.ai/v1/tts/', body, {
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    timeout: 30000,
+  })
+  const submitData = submitResp.data as { uuid?: string; error?: string }
+  if (!submitData.uuid) {
+    throw new Error(submitData.error || 'TTS.ai did not return a job uuid')
+  }
+
+  const deadline = Date.now() + 120000
+  let resultUrl = ''
+  while (Date.now() < deadline) {
+    const pollResp = await axios.get(
+      `https://api.tts.ai/v1/speech/results/?uuid=${submitData.uuid}`,
+      { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 10000 }
+    )
+    const pollData = pollResp.data as { status?: string; result_url?: string; error?: string }
+    if (pollData.status === 'completed' && pollData.result_url) {
+      resultUrl = pollData.result_url
+      break
+    }
+    if (pollData.status === 'failed') {
+      throw new Error(pollData.error || 'TTS.ai generation failed')
+    }
+    await new Promise((r) => setTimeout(r, 1500))
+  }
+  if (!resultUrl) {
+    throw new Error('TTS.ai generation timed out after 120s')
+  }
+
+  const audioResp = await axios.get(resultUrl, {
+    responseType: 'arraybuffer',
+    timeout: 60000,
+  })
+  return Array.from(new Uint8Array(audioResp.data))
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
@@ -102,7 +146,7 @@ function registerIpcHandlers(): void {
 
       switch (provider) {
         case 'ttsai':
-          url = 'https://api.tts.ai/v1/voices'
+          url = 'https://api.tts.ai/v1/voices/'
           headers['Authorization'] = `Bearer ${apiKey}`
           break
         case 'fishaudio':
@@ -320,24 +364,24 @@ function registerIpcHandlers(): void {
 
     try {
       const startTime = Date.now()
+      let audioArray: number[]
 
+      if (provider === 'ttsai') {
+        const ttsaiBody: Record<string, unknown> = {
+          text: ttsRequest.text,
+          voice: ttsRequest.voiceId,
+          format: ttsRequest.outputFormat ?? 'mp3',
+          speed: ttsRequest.speed ?? 1.0,
+        }
+        if (ttsRequest.language) ttsaiBody.language = ttsRequest.language
+        audioArray = await generateAudioViaTTSAi(apiKey, ttsaiBody)
+      } else {
       let url: string
       let headers: Record<string, string> = {}
       let body: Record<string, unknown>
       let responseType: ResponseType = 'arraybuffer'
 
       switch (provider) {
-        case 'ttsai':
-          url = 'https://api.tts.ai/v1/tts'
-          headers = { Authorization: `Bearer ${apiKey}` }
-          body = {
-            text: ttsRequest.text,
-            voice_id: ttsRequest.voiceId,
-            speed: ttsRequest.speed ?? 1.0,
-            output_format: ttsRequest.outputFormat ?? 'mp3',
-            language: ttsRequest.language,
-          }
-          break
         case 'fishaudio':
           url = 'https://api.fish.audio/v1/tts'
           headers = { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
@@ -376,8 +420,10 @@ function registerIpcHandlers(): void {
         timeout: 30000,
       })
 
+      audioArray = Array.from(new Uint8Array(response.data))
+      }
+
       const durationSeconds = (Date.now() - startTime) / 1000
-      const audioArray = Array.from(new Uint8Array(response.data))
 
       // Log usage
       db.prepare(`
@@ -442,7 +488,7 @@ function registerIpcHandlers(): void {
 
       switch (provider) {
         case 'ttsai':
-          url = 'https://api.tts.ai/v1/voices'
+          url = 'https://api.tts.ai/v1/voices/'
           headers['Authorization'] = `Bearer ${apiKey}`
           break
         case 'fishaudio':
@@ -852,11 +898,20 @@ function registerIpcHandlers(): void {
           headers = { 'xi-api-key': apiKey, Accept: 'audio/mpeg' }
           body = { text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }
           break
-        case 'ttsai':
-          url = 'https://api.tts.ai/v1/tts'
-          headers = { Authorization: `Bearer ${apiKey}` }
-          body = { text, voice_id: voiceId, speed: 1.0, output_format: 'mp3' }
-          break
+        case 'ttsai': {
+          const audioArray = await generateAudioViaTTSAi(apiKey, {
+            text,
+            voice: voiceId,
+            format: 'mp3',
+            speed: 1.0,
+          })
+          const durationSeconds = (Date.now() - startTime) / 1000
+          db.prepare(`
+            INSERT INTO usage_logs (api_key_id, action, input_text, characters_used, duration_seconds, status)
+            VALUES (?, 'tts', ?, ?, ?, 'success')
+          `).run(apiKeyRecord.id, text, text.length, durationSeconds)
+          return { success: true, audioData: audioArray, charactersUsed: text.length }
+        }
         default:
           url = `${baseUrl || ''}/v1/audio/speech`
           headers = { Authorization: `Bearer ${apiKey}` }
