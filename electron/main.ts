@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, net } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
-import axios from 'axios'
+import axios, { type ResponseType } from 'axios'
 import FormData from 'form-data'
 import { getDatabase, closeDatabase } from './db'
 
@@ -20,7 +20,7 @@ function createWindow(): void {
     title: 'VoiceHub',
     backgroundColor: '#030712',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
@@ -324,7 +324,7 @@ function registerIpcHandlers(): void {
       let url: string
       let headers: Record<string, string> = {}
       let body: Record<string, unknown>
-      let responseType = 'arraybuffer'
+      let responseType: ResponseType = 'arraybuffer'
 
       switch (provider) {
         case 'ttsai':
